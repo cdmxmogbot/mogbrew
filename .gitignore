@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.output/
+.vinxi/
+.wrangler/
+scaffold/
+
+# AI reference repos — large clones, never committed
+.repos/
+
+# Local secrets — never commit
+.dev.vars
+
+# Generated — run npm run cf-typegen / npm run db:generate to recreate
+app/routeTree.gen.ts
+wrangler.d.ts
+worker-configuration.d.ts
+app/db/migrations/

@@ -1,0 +1,5 @@
+# .dev.vars — local secrets for wrangler dev
+# Copy to .dev.vars and fill in real values. Never commit .dev.vars.
+
+CREW_KEY=MOGCHAT2026
+# Add other secrets below:

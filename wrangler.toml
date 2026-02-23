@@ -1,0 +1,41 @@
+name = "mogbrew"
+compatibility_date = "2026-02-22"
+compatibility_flags = ["nodejs_compat"]
+main = "dist/server/server.js"
+
+[assets]
+directory = "dist/client"
+
+# ── Observability (always on) ─────────────────────────────
+[observability]
+enabled = true
+
+# ── Bindings ──────────────────────────────────────────────
+# Uncomment what this app needs:
+
+# [ai]
+# binding = "AI"
+
+# [[kv_namespaces]]
+# binding = "KV"
+# id = "NAMESPACE_ID"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mogbrew"
+database_id = "ec022746-3053-487d-b51e-a5aeb9b9eb0b"
+
+# Error logging (shared across all apps)
+# [[d1_databases]]
+# binding = "ERRORS"
+# database_name = "mogerrors"
+# database_id = "1aef03ef-c415-4acb-9ced-eab3f7176940"
+
+# [[r2_buckets]]
+# binding = "R2"
+# bucket_name = "BUCKET_NAME"
+
+# ── Env vars ───────────────────────────────────────────────
+# Secrets → .dev.vars (local) and `wrangler secret put VAR_NAME` (prod)
+# [vars]
+# PUBLIC_VAR = "value"
