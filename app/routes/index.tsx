@@ -23,6 +23,8 @@ export const Route = createFileRoute('/')({
 function Home() {
   const [open, setOpen] = useState(false);
   const [selectedBeer, setSelectedBeer] = useState<Beer | null>(null);
+  const [selectedContainer, setSelectedContainer] = useState<typeof CONTAINER_TYPES[number] | null>(null);
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
   const queryClient = useQueryClient();
 
   const { data: todayBeers = [], isLoading } = useQuery({
@@ -35,7 +37,6 @@ function Home() {
       logBeer({ data }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['todayBeers'] });
-      setSelectedBeer(null);
     },
   });
 
@@ -47,19 +48,32 @@ function Home() {
   });
 
   const handleContainerSelect = (container: typeof CONTAINER_TYPES[number]) => {
-    if (!selectedBeer) return;
-    logMutation.mutate({
-      beer_name: selectedBeer.name,
-      brand: selectedBeer.brand,
-      abv: selectedBeer.abv,
-      container_type: container.id,
-      volume_ml: container.volume_ml,
+    setSelectedContainer(container);
+    setSelectedQuantity(1);
+  };
+
+  const handleQuantitySelect = (quantity: number) => {
+    if (!selectedBeer || !selectedContainer) return;
+    // Log multiple entries for quantity > 1
+    const promises = Array.from({ length: quantity }, () =>
+      logMutation.mutateAsync({
+        beer_name: selectedBeer.name,
+        brand: selectedBeer.brand,
+        abv: selectedBeer.abv,
+        container_type: selectedContainer.id,
+        volume_ml: selectedContainer.volume_ml,
+      })
+    );
+    Promise.all(promises).then(() => {
+      setSelectedBeer(null);
+      setSelectedContainer(null);
+      setSelectedQuantity(1);
     });
   };
 
   const totalBeers = todayBeers.length;
   const totalVolume = todayBeers.reduce((sum, b) => sum + (b.volume_ml || 0), 0);
-  const stdDrinks = todayBeers.reduce((sum, b) => sum + ((b.volume_ml * b.abv * 0.789) / 10000), 0);
+  const stdDrinks = todayBeers.reduce((sum, b) => sum + ((b.volume_ml * (b.abv / 100) * 0.789) / 14), 0);
 
   return (
     <main className="p-4 max-w-lg mx-auto">
@@ -113,7 +127,7 @@ function Home() {
         </Popover>
       </section>
 
-      {selectedBeer && (
+      {selectedBeer && !selectedContainer && (
         <section className="mb-6">
           <h2 className="text-lg font-semibold mb-3 text-zinc-300">Select Container</h2>
           <div className="grid grid-cols-2 gap-3">
@@ -123,12 +137,53 @@ function Home() {
                 variant="outline"
                 className="h-16 flex flex-col items-center justify-center bg-zinc-900 border-zinc-800 hover:bg-green-500/20 hover:border-green-500"
                 onClick={() => handleContainerSelect(container)}
-                disabled={logMutation.isPending}
               >
                 <span className="text-2xl">{container.emoji}</span>
                 <span className="text-xs mt-1">{container.label}</span>
               </Button>
             ))}
+          </div>
+        </section>
+      )}
+
+      {selectedBeer && selectedContainer && (
+        <section className="mb-6">
+          <h2 className="text-lg font-semibold mb-3 text-zinc-300">
+            {selectedBeer.name} - {selectedContainer.emoji} {selectedContainer.label}
+          </h2>
+          <p className="text-sm text-zinc-400 mb-3">How many?</p>
+          <div className="flex gap-2">
+            {[1, 2, 3, 4, 5].map((qty) => (
+              <Button
+                key={qty}
+                variant="outline"
+                className={`flex-1 h-14 text-lg ${selectedQuantity === qty ? 'bg-green-500/20 border-green-500 text-green-500' : 'bg-zinc-900 border-zinc-800'}`}
+                onClick={() => setSelectedQuantity(qty)}
+                disabled={logMutation.isPending}
+              >
+                {qty}
+              </Button>
+            ))}
+          </div>
+          <div className="flex gap-2 mt-3">
+            <Button
+              variant="outline"
+              className="flex-1 h-12 bg-zinc-900 border-zinc-800"
+              onClick={() => {
+                setSelectedContainer(null);
+                setSelectedQuantity(1);
+              }}
+              disabled={logMutation.isPending}
+            >
+              Back
+            </Button>
+            <Button
+              className="flex-1 h-12 bg-green-500 hover:bg-green-600 text-black font-semibold"
+              onClick={() => handleQuantitySelect(selectedQuantity)}
+              disabled={logMutation.isPending}
+            >
+              {logMutation.isPending ? 'Logging...' : `Log ${selectedQuantity} ${selectedQuantity === 1 ? 'beer' : 'beers'}`}
+            </Button>
           </div>
         </section>
       )}
