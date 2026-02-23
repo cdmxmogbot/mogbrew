@@ -18,7 +18,7 @@ export default defineConfig({
     tailwindcss(),
     // viteEnvironment.name must match TanStack Start's SSR env name: 'server'
     cloudflare({ viteEnvironment: { name: 'server' } }),
-    tanstackStart({ srcDirectory: 'app' }),
+    tanstackStart({ srcDirectory: 'app', server: { entry: './server' } }),
     react(),
   ],
 });
