@@ -48,3 +48,33 @@ export const CONTAINER_TYPES = [
 
 export type Beer = (typeof MEXICAN_BEERS)[number];
 export type ContainerType = (typeof CONTAINER_TYPES)[number];
+
+export const BRAND_META: Record<string, { color: string; abbr: string; logo?: string }> = {
+  "Grupo Modelo": {
+    color: "#1a6b3a",
+    abbr: "GM",
+    logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Modelo_Especial_bottle.jpg/100px-Modelo_Especial_bottle.jpg"
+  },
+  "Cuauhtémoc Moctezuma": {
+    color: "#c8a020",
+    abbr: "CM",
+    logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Tecate_lata.jpg/100px-Tecate_lata.jpg"
+  },
+  "Minerva": { color: "#7c3aed", abbr: "MN" },
+  "Cucapá": { color: "#0891b2", abbr: "CU" },
+  "Tempus": { color: "#dc2626", abbr: "TP" },
+  "Wendlandt": { color: "#059669", abbr: "WE" },
+  "Cervecería de Colima": { color: "#ea580c", abbr: "CC" },
+  "Ramuri": { color: "#be185d", abbr: "RA" },
+  "Regional": { color: "#64748b", abbr: "RE" },
+};
+
+export const BEER_LOGOS: Record<string, string> = {
+  "Corona Extra": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Corona_Extra_beer_bottle.jpg/80px-Corona_Extra_beer_bottle.jpg",
+  "Modelo Especial": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Modelo_Especial.jpg/80px-Modelo_Especial.jpg",
+  "Pacífico": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Cerveza_Pac%C3%ADfico.jpg/80px-Cerveza_Pac%C3%ADfico.jpg",
+  "Tecate": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Cerveza_Tecate.jpg/80px-Cerveza_Tecate.jpg",
+};
+
+// Get unique brands for filter chips
+export const BEER_BRANDS = [...new Set(MEXICAN_BEERS.map(b => b.brand))] as string[];

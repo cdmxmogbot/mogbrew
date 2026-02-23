@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getInsights } from '~/lib/api';
 import { CONTAINER_TYPES } from '~/lib/beers';
@@ -122,12 +123,27 @@ function Insights() {
     );
   }
 
-  const dailyData = data?.daily?.map((d) => ({
-    day: d.day?.slice(5) || '',
-    count: d.count || 0,
-    stdDrinks: d.std_drinks || 0,
-    fill: getBarColor(d.std_drinks || 0),
-  })) || [];
+  // Generate full 14 days, filling missing days with 0
+  const dailyData = useMemo(() => {
+    const dbMap = new Map((data?.daily || []).map(d => [d.day, d]));
+    const days: { day: string; count: number; stdDrinks: number; fill: string }[] = [];
+    const today = new Date();
+
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const entry = dbMap.get(dateStr);
+      const stdDrinks = entry?.std_drinks || 0;
+      days.push({
+        day: dateStr.slice(5), // MM-DD
+        count: entry?.count || 0,
+        stdDrinks,
+        fill: getBarColor(stdDrinks),
+      });
+    }
+    return days;
+  }, [data?.daily]);
 
   const brandsData = data?.brands?.map((b) => ({
     name: b.brand || 'Unknown',
