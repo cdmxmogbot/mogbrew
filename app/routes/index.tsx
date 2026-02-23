@@ -2,7 +2,8 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MEXICAN_BEERS, CONTAINER_TYPES, type Beer } from '~/lib/beers';
-import { getTodayBeers, logBeer, deleteBeer, type BeerLogEntry } from '~/lib/api';
+import { getTodayBeers, logBeer, deleteBeer, getRecentBeers, type BeerLogEntry } from '~/lib/api';
+import { useUser } from '~/lib/user-context';
 import { Badge } from '~/components/ui/badge';
 import { Button } from '~/components/ui/button';
 import { Card } from '~/components/ui/card';
@@ -21,29 +22,47 @@ export const Route = createFileRoute('/')({
 });
 
 function Home() {
+  const { user } = useUser();
   const [open, setOpen] = useState(false);
   const [selectedBeer, setSelectedBeer] = useState<Beer | null>(null);
   const [selectedContainer, setSelectedContainer] = useState<typeof CONTAINER_TYPES[number] | null>(null);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
   const queryClient = useQueryClient();
 
+  const userId = user?.id || 'ian';
+
   const { data: todayBeers = [], isLoading } = useQuery({
-    queryKey: ['todayBeers'],
-    queryFn: () => getTodayBeers(),
+    queryKey: ['todayBeers', userId],
+    queryFn: () => getTodayBeers({ data: { user_id: userId } }),
+    enabled: !!user,
+  });
+
+  const { data: recentBeers = [] } = useQuery({
+    queryKey: ['recentBeers', userId],
+    queryFn: () => getRecentBeers({ data: { user_id: userId } }),
+    enabled: !!user,
   });
 
   const logMutation = useMutation({
-    mutationFn: (data: { beer_name: string; brand: string; abv: number; container_type: string; volume_ml: number }) =>
-      logBeer({ data }),
+    mutationFn: (data: {
+      user_id: string;
+      beer_name: string;
+      brand: string;
+      abv: number;
+      container_type: string;
+      volume_ml: number;
+      quantity: number;
+    }) => logBeer({ data }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['todayBeers'] });
+      queryClient.invalidateQueries({ queryKey: ['todayBeers', userId] });
+      queryClient.invalidateQueries({ queryKey: ['recentBeers', userId] });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteBeer({ data: { id } }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['todayBeers'] });
+      queryClient.invalidateQueries({ queryKey: ['todayBeers', userId] });
     },
   });
 
@@ -54,20 +73,32 @@ function Home() {
 
   const handleQuantitySelect = (quantity: number) => {
     if (!selectedBeer || !selectedContainer) return;
-    // Log multiple entries for quantity > 1
-    const promises = Array.from({ length: quantity }, () =>
-      logMutation.mutateAsync({
-        beer_name: selectedBeer.name,
-        brand: selectedBeer.brand,
-        abv: selectedBeer.abv,
-        container_type: selectedContainer.id,
-        volume_ml: selectedContainer.volume_ml,
-      })
-    );
-    Promise.all(promises).then(() => {
-      setSelectedBeer(null);
-      setSelectedContainer(null);
-      setSelectedQuantity(1);
+    logMutation.mutate({
+      user_id: userId,
+      beer_name: selectedBeer.name,
+      brand: selectedBeer.brand,
+      abv: selectedBeer.abv,
+      container_type: selectedContainer.id,
+      volume_ml: selectedContainer.volume_ml,
+      quantity,
+    }, {
+      onSuccess: () => {
+        setSelectedBeer(null);
+        setSelectedContainer(null);
+        setSelectedQuantity(1);
+      }
+    });
+  };
+
+  const handleQuickAdd = (beer: typeof recentBeers[number]) => {
+    logMutation.mutate({
+      user_id: userId,
+      beer_name: beer.beer_name,
+      brand: beer.brand,
+      abv: beer.abv,
+      container_type: beer.container_type,
+      volume_ml: beer.volume_ml,
+      quantity: 1,
     });
   };
 
@@ -75,15 +106,54 @@ function Home() {
   const totalVolume = todayBeers.reduce((sum, b) => sum + (b.volume_ml || 0), 0);
   const stdDrinks = todayBeers.reduce((sum, b) => sum + ((b.volume_ml * (b.abv / 100) * 0.789) / 14), 0);
 
+  if (!user) return null;
+
   return (
     <main className="p-4 max-w-lg mx-auto">
-      <header className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">🍺 MOGBREW</h1>
-        <Badge variant="secondary" className="bg-green-500/20 text-green-500 text-lg px-3 py-1">
-          {totalBeers}
-        </Badge>
-      </header>
+      {/* Today Summary Card */}
+      <Card className="p-4 mb-6 bg-zinc-900 border-zinc-800 rounded-2xl">
+        <p className="text-sm text-zinc-400 mb-2">Today</p>
+        <div className="flex justify-around text-center">
+          <div>
+            <p className="text-2xl font-bold text-green-500">{totalBeers}</p>
+            <p className="text-xs text-zinc-400">beers</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-green-500">{totalVolume}</p>
+            <p className="text-xs text-zinc-400">mL</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-green-500">{stdDrinks.toFixed(1)}</p>
+            <p className="text-xs text-zinc-400">std drinks</p>
+          </div>
+        </div>
+      </Card>
 
+      {/* Quick Add */}
+      {recentBeers.length > 0 && !selectedBeer && (
+        <section className="mb-6">
+          <p className="text-sm text-zinc-400 mb-2">Quick add</p>
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {recentBeers.map((beer, i) => {
+              const container = CONTAINER_TYPES.find((c) => c.id === beer.container_type);
+              return (
+                <Button
+                  key={`${beer.beer_name}-${beer.container_type}-${i}`}
+                  variant="outline"
+                  className="flex-shrink-0 h-14 px-4 bg-zinc-900 border-zinc-700 hover:bg-green-500/20 hover:border-green-500"
+                  onClick={() => handleQuickAdd(beer)}
+                  disabled={logMutation.isPending}
+                >
+                  <span className="mr-2">{container?.emoji || '🍺'}</span>
+                  <span className="text-sm truncate max-w-24">{beer.beer_name}</span>
+                </Button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Beer Search */}
       <section className="mb-6">
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
@@ -127,6 +197,7 @@ function Home() {
         </Popover>
       </section>
 
+      {/* Container Selection */}
       {selectedBeer && !selectedContainer && (
         <section className="mb-6">
           <h2 className="text-lg font-semibold mb-3 text-zinc-300">Select Container</h2>
@@ -146,6 +217,7 @@ function Home() {
         </section>
       )}
 
+      {/* Quantity Selection */}
       {selectedBeer && selectedContainer && (
         <section className="mb-6">
           <h2 className="text-lg font-semibold mb-3 text-zinc-300">
@@ -188,6 +260,7 @@ function Home() {
         </section>
       )}
 
+      {/* Today's Beers List */}
       <section className="mb-6">
         <h2 className="text-lg font-semibold mb-3 text-zinc-300">Today's Beers</h2>
         {isLoading ? (
@@ -226,23 +299,6 @@ function Home() {
             })}
           </div>
         )}
-      </section>
-
-      <section className="fixed bottom-20 left-0 right-0 bg-zinc-950 border-t border-zinc-800 p-4">
-        <div className="flex justify-around text-center max-w-lg mx-auto">
-          <div>
-            <p className="text-2xl font-bold text-green-500">{totalBeers}</p>
-            <p className="text-xs text-zinc-400">beers</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-green-500">{totalVolume}</p>
-            <p className="text-xs text-zinc-400">mL</p>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-green-500">{stdDrinks.toFixed(1)}</p>
-            <p className="text-xs text-zinc-400">std drinks</p>
-          </div>
-        </div>
       </section>
     </main>
   );

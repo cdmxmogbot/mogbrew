@@ -1,0 +1,1 @@
+ALTER TABLE beer_log ADD COLUMN user_id TEXT NOT NULL DEFAULT 'ian';
